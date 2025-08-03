@@ -160,3 +160,10 @@ def check_card():
     result["time"] = f"{time.time() - start:.2f}s"
     result["credit"] = "API BY: @hardhackar007"
     return jsonify(result)
+
+# TAMBAHKAN INI DI PALING BAWAH FILE
+import os
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
